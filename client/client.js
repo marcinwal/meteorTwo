@@ -53,6 +53,28 @@ Template.registerHelper('withIndex',function(list){
   return withIndex;
 });
 
+Template.plantsFieldset.events({
+  'click button.removePlant': function(evt){
+    evt.preventDefault();
+    var index = evt.target.getAttribute('data-index');
+    var plants = Template.parentData(1).plants; //accessing for 1 
+    //template parrent above
+    plants.splice(index,1);
+    var modifier = {$set:{'plants': plants}};
+    updateLocalHouse(Session.get('selectedHouseId'),modifier);
+  },
+  'keyup input.color, keyup input.instructions': function(evt){
+    evt.preventDefault();
+    var index = evt.target.getAttribute('data-index');
+    var field = evt.target.getAttribute('class');
+    var plantProperty = 'plants.'+index+'.'+field;
+    var modifier = {$set: {}};
+    modifier['$set'][plantProperty] = evt.target.value; //???????
+    //aasigning a new value using brucker notation
+    updateLocalHouse(Session.get('selectedHouseId'),modifier);
+  }
+});
+
 Template.plantDetails.events({
   'click button.water': function(evt){
     var lastvisit = new Date();
