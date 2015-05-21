@@ -1,6 +1,18 @@
+LocalHouse = new Mongo.Collection(null);
+var newHouse = {
+  name: '',
+  plants: [],
+  lastsave: 'never',
+  status: 'unsaved'
+};
+
+Session.setDefault('selectedHouseId','');
+
 Tracker.autorun(function(){
   console.log("The selected ID is: " + Session.get("selectedHouse"));
 });
+
+
 
 Template.selectHouse.helpers({
   houseNameId: function(){
@@ -13,14 +25,32 @@ Template.selectHouse.helpers({
 
 Template.selectHouse.events = {
   'change #selectHouse': function(evt){
-    Session.set("selectedHouse",evt.currentTarget.value);
+    var selectedId = evt.currentTarget.value;
+    var newID = LocalHouse.upsert(
+      selectedId,
+      HousesCollection.findOne(selectedId) || newHouse
+      ).insertedId;  //insertedId is returned
+    Session.set("selectedHouseId",newID);
   }
 };
 
-Template.showHouse.helpers({
-  house: function(){
-    return HousesCollection.findOne({_id: Session.get("selectedHouse")});
-  }
+Template.registerHelper('selectedHouse',function(){
+  return LocalHouse.findOne(Session.get('selectedHouseId'))
+});
+
+// Template.showHouse.helpers({
+//   house: function(){
+//     return HousesCollection.findOne({_id: Session.get("selectedHouse")});
+//   }
+// });
+
+Template.registerHelper('withIndex',function(list){
+  var withIndex = _.map(list,function(v,i){
+    if(v === null) return;
+    v.index = i;
+    return v;
+  });
+  return withIndex;
 });
 
 Template.plantDetails.events({
@@ -40,16 +70,29 @@ Template.plantDetails.helpers({
   }
 });
 
+
+
 Template.houseForm.events({
+  'click button.addPlant': function(evt){
+    evt.preventDefault();
+    var newPlant = {color: '',instructions: ''};
+    var modifier = {$push: {'plants': newPlant}};
+    updateLocalHouse(Session.get('selectedHouseId'),modifier);
+  },
+  'keyup input#house-name': function(evt){
+    evt.preventDefault();
+    var modifier = {$set: {'name': evt.currentTarget.value}};
+    updateLocalHouse(Session.get('selectedHouseId'),modifier);
+  },
   'click button#saveHouse': function(evt){
     evt.preventDefault();
-    var houseName = $("input[id=house-name]").val();
-    var plantColor = $("input[id=plant-color]").val();    
-    var plantInstructions = $("input[id=plant-instructions]").val();
-    Session.set("selectedHouse",HousesCollection.insert({
-      name: houseName,
-      plants: [{color: plantColor,instructions: plantInstructions}]
-    }));
+    var id = Session.get('selectedHouseId');
+    var modifier = {$set: {'lastsave': new Date()}};
+    updateLocalHouse(id,modifier);
+    HousesCollection.upsert(
+      {_id: id},
+      LocalHouse.findOne(id)
+    );
   }
 });
 
@@ -63,3 +106,13 @@ Template.showHouse.events({
     }
   }
 });
+
+
+updateLocalHouse = function (id,modifier){
+  LocalHouse.update(
+    {
+      '_id': id,
+    },
+    modifier
+  );
+};
